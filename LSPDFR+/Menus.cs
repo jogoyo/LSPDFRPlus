@@ -1,21 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Threading;
+using System.Windows.Forms;
+using Albo1125.Common.CommonLibrary;
 using LSPD_First_Response.Mod.API;
 using Rage;
-using System.Diagnostics;
-using System.Globalization;
-using System.IO;
-using System.Reflection;
-using System.Windows.Forms;
+using Rage.Native;
 using RAGENativeUI;
 using RAGENativeUI.Elements;
-using System.Drawing;
-using Rage.Native;
 using RAGENativeUI.PauseMenu;
-using Albo1125.Common.CommonLibrary;
 
 namespace LSPDFR_
 {
@@ -27,92 +21,89 @@ namespace LSPDFR_
         //private static UIMenuItem CheckPlateItem;
         
         //private static UIMenuItem CheckCourtResultsItem;
-        private static MenuPool _MenuPool;
-
-        
-
+        private static MenuPool _menuPool;
 
         //Speech, ID, ticket, warning, out of vehicle
-        private static UIMenu TrafficStopMenu;
-        private static UIMenuListItem SpeechItem;
-        private static UIMenuListItem IDItem;
-        private static UIMenuItem QuestionDriverItem;
-        private static UIMenuItem PenaltyItem;
-        private static UIMenuItem WarningItem;
-        private static UIMenuListItem OutOfVehicleItem;
-        private static List<dynamic> OccupantSelector = new List<dynamic>() { "Driver", "Passengers", "All occupants" };
+        private static UIMenu _trafficStopMenu;
+        private static UIMenuListItem _speechItem;
+        private static UIMenuListItem _idItem;
+        private static UIMenuItem _questionDriverItem;
+        private static UIMenuItem _penaltyItem;
+        private static UIMenuItem _warningItem;
+        private static UIMenuListItem _outOfVehicleItem;
+        private static readonly List<dynamic> OccupantSelector = new List<dynamic> { "Driver", "Passengers", "All occupants" };
 
         //public static UIMenuSwitchMenusItem MenuSwitchListItem;
         //private static UIMenu ActiveMenu = ChecksMenu;
 
-        private static UIMenu TicketMenu;
-        private static UIMenuListItem FineItem;
-        private static List<string> FineList = new List<string>();
+        private static UIMenu _ticketMenu;
+        private static UIMenuListItem _fineItem;
+        private static readonly List<string> FineList = new List<string>();
 
-        private static UIMenuListItem PointsItem;
-        private static List<string> PointsList = new List<string>();
+        private static UIMenuListItem _pointsItem;
+        private static readonly List<string> PointsList = new List<string>();
 
-        private static List<string> DefaultTicketReasonsList = new List<string>() { "Careless driving", "Speeding", "Mobile Phone", "Traffic light offence", "Illegal tyre", "Road Obstruction",
-            "No insurance", "Expired registration", "No seat belt", "Expired licence", "Unroadworthy vehicle", "Lane splitting", "No helmet", "Failure to yield", "Tailgating", "Unsecure load" };
+        //private static List<string> _defaultTicketReasonsList = new List<string>() { "Careless driving", "Speeding", "Mobile Phone", "Traffic light offence", "Illegal tyre", "Road Obstruction",
+            //"No insurance", "Expired registration", "No seat belt", "Expired licence", "Unroadworthy vehicle", "Lane splitting", "No helmet", "Failure to yield", "Tailgating", "Unsecure load" };
 
-        private static UIMenuItem TicketOffenceSelectorItem = new UIMenuItem("Select Offences");
+        private static readonly UIMenuItem TicketOffenceSelectorItem = new UIMenuItem("Select Offences");
 
 
-        private static UIMenuListItem IssueTicketItem;
-        private static UIMenuCheckboxItem SeizeVehicleTicketCheckboxItem;
+        private static UIMenuListItem _issueTicketItem;
+        private static UIMenuCheckboxItem _seizeVehicleTicketCheckboxItem;
         
 
-        private static UIMenu QuestioningMenu;
-        private static UIMenuItem IllegalInVehQuestionItem;
-        private static UIMenuItem DrinkingQuestionItem;
-        private static UIMenuItem DrugsQuestionItem;
-        private static UIMenuItem SearchPermissionItem;
+        private static UIMenu _questioningMenu;
+        private static UIMenuItem _illegalInVehQuestionItem;
+        private static UIMenuItem _drinkingQuestionItem;
+        private static UIMenuItem _drugsQuestionItem;
+        private static UIMenuItem _searchPermissionItem;
 
-        private static List<UIMenuItem> CustomQuestionsItems = new List<UIMenuItem>();
-        private static List<UIMenuItem> CustomQuestionsCallbacksAnswersItems = new List<UIMenuItem>();
-        private static List<UIMenuItem> CustomQuestionsAnswersCallbackItems = new List<UIMenuItem>();
+        private static readonly List<UIMenuItem> CustomQuestionsItems = new List<UIMenuItem>();
+        private static readonly List<UIMenuItem> CustomQuestionsCallbacksAnswersItems = new List<UIMenuItem>();
+        private static readonly List<UIMenuItem> CustomQuestionsAnswersCallbackItems = new List<UIMenuItem>();
 
-        public static TabView CourtsMenu;
+        private static TabView _courtsMenu;
 
         public static TabSubmenuItem PendingResultsList;
         public static TabSubmenuItem PublishedResultsList;
 
-        public static UIMenu PursuitTacticsMenu;
+        /*private static UIMenu _pursuitTacticsMenu;
         public static UIMenuCheckboxItem AutomaticTacticsCheckboxItem;
         public static UIMenuListItem PursuitTacticsListItem;
-        public static List<DisplayItem> PursuitTacticsOptionsList = new List<DisplayItem>() { new DisplayItem("Safe"), new DisplayItem("Slightly Aggressive"), new DisplayItem("Full-out aggressive") };
+        private static readonly List<DisplayItem> PursuitTacticsOptionsList = new List<DisplayItem> { new DisplayItem("Safe"), new DisplayItem("Slightly Aggressive"), new DisplayItem("Full-out aggressive") };*/
 
-        public static List<UIMenu> OffenceCategoryMenus = new List<UIMenu>();
-        public static UIMenuSwitchMenusItem OffenceCategorySwitchItem;
+        private static List<UIMenu> OffenceCategoryMenus = new List<UIMenu>();
+        private static UIMenuSwitchMenusItem _offenceCategorySwitchItem;
         public static List<UIMenuCheckboxItem> Offences = new List<UIMenuCheckboxItem>();
-        public static TupleList<UIMenuCheckboxItem, Offence> CheckboxItems_Offences = new TupleList<UIMenuCheckboxItem, Offence>();
+        private static TupleList<UIMenuCheckboxItem, Offence> CheckboxItems_Offences = new TupleList<UIMenuCheckboxItem, Offence>();
 
-        public static bool TrafficStopMenuEnabled = true;
+        private static bool _trafficStopMenuEnabled = true;
 
-        public static bool StandardQuestionsInMenu = true;
+        private static bool _standardQuestionsInMenu = true;
 
-        public static void ToggleStandardQuestions(bool Enabled)
+        private static void ToggleStandardQuestions(bool Enabled)
         {
-            if (Enabled && !StandardQuestionsInMenu)
+            if (Enabled && !_standardQuestionsInMenu)
             {
-                QuestioningMenu.Clear();
-                QuestioningMenu.AddItem(IllegalInVehQuestionItem = new UIMenuItem(""));
-                QuestioningMenu.AddItem(DrinkingQuestionItem = new UIMenuItem(""));
-                QuestioningMenu.AddItem(DrugsQuestionItem = new UIMenuItem(""));
-                QuestioningMenu.AddItem(SearchPermissionItem = new UIMenuItem(""));
-                StandardQuestionsInMenu = true;
+                _questioningMenu.Clear();
+                _questioningMenu.AddItem(_illegalInVehQuestionItem = new UIMenuItem(""));
+                _questioningMenu.AddItem(_drinkingQuestionItem = new UIMenuItem(""));
+                _questioningMenu.AddItem(_drugsQuestionItem = new UIMenuItem(""));
+                _questioningMenu.AddItem(_searchPermissionItem = new UIMenuItem(""));
+                _standardQuestionsInMenu = true;
             }
 
-            else if (!Enabled && StandardQuestionsInMenu)
+            else if (!Enabled && _standardQuestionsInMenu)
             {
 
-                QuestioningMenu.Clear();
-                StandardQuestionsInMenu = false;
+                _questioningMenu.Clear();
+                _standardQuestionsInMenu = false;
 
             }
         }
 
-        public static void OpenOffencesMenu(UIMenu callingMenu, List<Offence> SelectedOffences)
+        private static void OpenOffencesMenu(UIMenu callingMenu, List<Offence> SelectedOffences)
         {            
             foreach (UIMenu men in OffenceCategoryMenus)
             {
@@ -121,7 +112,7 @@ namespace LSPDFR_
                 {
                     if (it is UIMenuCheckboxItem)
                     {
-                        ((UIMenuCheckboxItem)it).Checked = SelectedOffences.Contains(CheckboxItems_Offences.FirstOrDefault(x => x.Item1 == it).Item2);
+                        ((UIMenuCheckboxItem)it).Checked = SelectedOffences.Contains(CheckboxItems_Offences.FirstOrDefault(x => x.Item1 == it)?.Item2);
                         
                     }
                 }
@@ -129,46 +120,46 @@ namespace LSPDFR_
             OffenceCategoryMenus[0].Visible = true;
         }
 
-        public static List<TabItem> EmptyItems = new List<TabItem>() { new TabItem(" ") };
+        private static readonly List<TabItem> EmptyItems = new List<TabItem> { new TabItem(" ") };
         public static void InitialiseMenus()
         {
             Game.FrameRender += Process;
-            _MenuPool = new MenuPool();
+            _menuPool = new MenuPool();
             //ChecksMenu = new UIMenu("Checks", "");
             //_MenuPool.Add(ChecksMenu);
-            TrafficStopMenu = new UIMenu("Traffic Stop", "LSPDFR+");
-            _MenuPool.Add(TrafficStopMenu);
-            TicketMenu = new UIMenu("Ticket", "");
-            _MenuPool.Add(TicketMenu);
+            _trafficStopMenu = new UIMenu("Traffic Stop", "LSPDFR+");
+            _menuPool.Add(_trafficStopMenu);
+            _ticketMenu = new UIMenu("Ticket", "");
+            _menuPool.Add(_ticketMenu);
 
-            PursuitTacticsMenu = new UIMenu("Pursuit Tactics", "");
-            PursuitTacticsMenu.AddItem(AutomaticTacticsCheckboxItem = new UIMenuCheckboxItem("Automatic Tactics", EnhancedPursuitAI.DefaultAutomaticAI));
-            PursuitTacticsMenu.AddItem(PursuitTacticsListItem = new UIMenuListItem("Current Tactic", "", PursuitTacticsOptionsList));
+            /*_pursuitTacticsMenu = new UIMenu("Pursuit Tactics", "");
+            _pursuitTacticsMenu.AddItem(AutomaticTacticsCheckboxItem = new UIMenuCheckboxItem("Automatic Tactics", EnhancedPursuitAI.DefaultAutomaticAi));
+            _pursuitTacticsMenu.AddItem(PursuitTacticsListItem = new UIMenuListItem("Current Tactic", "", PursuitTacticsOptionsList));
             PursuitTacticsListItem.Enabled = false;
-            PursuitTacticsMenu.RefreshIndex();
-            PursuitTacticsMenu.OnItemSelect += OnItemSelect;
-            PursuitTacticsMenu.OnCheckboxChange += OnCheckboxChange;
+            _pursuitTacticsMenu.RefreshIndex();
+            _pursuitTacticsMenu.OnItemSelect += OnItemSelect;
+            _pursuitTacticsMenu.OnCheckboxChange += OnCheckboxChange;
             //TrafficStopMenu.OnListChange += OnListChange;
-            PursuitTacticsMenu.MouseControlsEnabled = false;
-            PursuitTacticsMenu.AllowCameraMovement = true;
-            _MenuPool.Add(PursuitTacticsMenu);
+            _pursuitTacticsMenu.MouseControlsEnabled = false;
+            _pursuitTacticsMenu.AllowCameraMovement = true;
+            _menuPool.Add(_pursuitTacticsMenu);*/
 
 
-            Dictionary<UIMenu, string> UIMenus_Categories = new Dictionary<UIMenu, string>();
+            Dictionary<UIMenu, string> uiMenusCategories = new Dictionary<UIMenu, string>();
             foreach (string category in Offence.CategorizedTrafficOffences.Keys)
             {
                 UIMenu newcategorymenu = new UIMenu(category, "LSPDFR+ offences");
                 OffenceCategoryMenus.Add(newcategorymenu);
-                UIMenus_Categories.Add(newcategorymenu, category);
+                uiMenusCategories.Add(newcategorymenu, category);
 
             }
-            OffenceCategorySwitchItem = new UIMenuSwitchMenusItem("Categories", "", OffenceCategoryMenus);
+            _offenceCategorySwitchItem = new UIMenuSwitchMenusItem("Categories", "", OffenceCategoryMenus);
 
             foreach (UIMenu newcategorymenu in OffenceCategoryMenus)
             {
                 
-                newcategorymenu.AddItem(OffenceCategorySwitchItem);
-                string category = UIMenus_Categories[newcategorymenu];
+                newcategorymenu.AddItem(_offenceCategorySwitchItem);
+                string category = uiMenusCategories[newcategorymenu];
                 foreach (string reason in Offence.CategorizedTrafficOffences[category].Select(x => x.name))
                 {
                     UIMenuCheckboxItem newcheckboxitem = new UIMenuCheckboxItem(reason, false);
@@ -180,120 +171,114 @@ namespace LSPDFR_
                 newcategorymenu.RefreshIndex();
                 newcategorymenu.AllowCameraMovement = true;
                 newcategorymenu.MouseControlsEnabled = false;
-                _MenuPool.Add(newcategorymenu);
+                _menuPool.Add(newcategorymenu);
             }
 
 
 
-            var speech = new List<dynamic>() { "Hello", "Insult", "Kifflom", "Thanks", "Swear", "Warn", "Threaten" };
+            var speech = new List<dynamic> { "Hello", "Insult", "Kifflom", "Thanks", "Swear", "Warn", "Threaten" };
 
-            TrafficStopMenu.AddItem(SpeechItem = new UIMenuListItem("Speech", "", speech));
-            TrafficStopMenu.AddItem(IDItem = new UIMenuListItem("Ask for identification", "", OccupantSelector));
-            TrafficStopMenu.AddItem(QuestionDriverItem = new UIMenuItem("Question driver"));
-            TrafficStopMenu.AddItem(PenaltyItem = new UIMenuItem("Issue Penalty"));
-            TrafficStopMenu.AddItem(WarningItem = new UIMenuItem("Issue warning", "Let the driver go with words of advice."));
-            TrafficStopMenu.AddItem(OutOfVehicleItem = new UIMenuListItem("Order out of vehicle", "", OccupantSelector));
+            _trafficStopMenu.AddItem(_speechItem = new UIMenuListItem("Speech", "", speech));
+            _trafficStopMenu.AddItem(_idItem = new UIMenuListItem("Ask for ID", "", OccupantSelector));
+            _trafficStopMenu.AddItem(_questionDriverItem = new UIMenuItem("Question Driver"));
+            _trafficStopMenu.AddItem(_penaltyItem = new UIMenuItem("Issue Penalty"));
+            _trafficStopMenu.AddItem(_warningItem = new UIMenuItem("Issue Warning", "Let the driver go with words of advice."));
+            _trafficStopMenu.AddItem(_outOfVehicleItem = new UIMenuListItem("Order out of Vehicle", "", OccupantSelector));
 
-            TrafficStopMenu.RefreshIndex();
-            TrafficStopMenu.OnItemSelect += OnItemSelect;
+            _trafficStopMenu.RefreshIndex();
+            _trafficStopMenu.OnItemSelect += OnItemSelect;
 
-            TrafficStopMenu.MouseControlsEnabled = false;
-            TrafficStopMenu.AllowCameraMovement = true;
+            _trafficStopMenu.MouseControlsEnabled = false;
+            _trafficStopMenu.AllowCameraMovement = true;
 
-            for (int i = 5; i<=Offence.maxFine;i+=5)
+            for (int i = 5; i<=Offence.MaxFine;i+=5)
             {
-                FineList.Add(Offence.currency + i.ToString());
+                FineList.Add(Offence.Currency + i);
             }
 
-            for (int i = Offence.minpoints; i <= Offence.maxpoints; i += Offence.pointincstep)
+            for (int i = Offence.Minpoints; i <= Offence.Maxpoints; i += Offence.Pointincstep)
             {
                 PointsList.Add(i.ToString());
             }
-            TicketMenu.AddItem(TicketOffenceSelectorItem);
-            TicketMenu.AddItem(FineItem = new UIMenuListItem("Fine", "", FineList));
+            _ticketMenu.AddItem(TicketOffenceSelectorItem);
+            _ticketMenu.AddItem(_fineItem = new UIMenuListItem("Fine", "", FineList));
 
-            PointsItem = new UIMenuListItem("Points", "", PointsList);
-            if (Offence.enablePoints)
+            _pointsItem = new UIMenuListItem("Points", "", PointsList);
+            if (Offence.EnablePoints)
             {
-                TicketMenu.AddItem(PointsItem);
+                _ticketMenu.AddItem(_pointsItem);
             }
             
             //TicketMenu.AddItem(TicketReasonsListItem = new UIMenuListItem("Offence", TicketReasonsList, 0));            
-            TicketMenu.AddItem(SeizeVehicleTicketCheckboxItem = new UIMenuCheckboxItem("Seize Vehicle", false));
-            List<dynamic> PenaltyOptions = new List<dynamic>() { "Ticket", "Court Summons" };
-            if (LSPDFRPlusHandler.BritishPolicingScriptRunning)
-            {
-                PenaltyOptions = new List<dynamic> { "Traffic Offence Report", "Fixed Penalty Notice", "Court Summons" };
-            }
-            TicketMenu.AddItem(IssueTicketItem = new UIMenuListItem("~h~Issue ", "", PenaltyOptions));
-            IssueTicketItem.OnListChanged += OnIndexChange;
-            TicketMenu.ParentMenu = TrafficStopMenu;
-            TicketMenu.RefreshIndex();
-            TicketMenu.OnItemSelect += OnItemSelect;
+            _ticketMenu.AddItem(_seizeVehicleTicketCheckboxItem = new UIMenuCheckboxItem("Seize Vehicle", false));
+            List<dynamic> penaltyOptions = new List<dynamic> { "Ticket", "Court Summons" };
+            _ticketMenu.AddItem(_issueTicketItem = new UIMenuListItem("~h~Issue ", "", penaltyOptions));
+            _issueTicketItem.OnListChanged += OnIndexChange;
+            _ticketMenu.ParentMenu = _trafficStopMenu;
+            _ticketMenu.RefreshIndex();
+            _ticketMenu.OnItemSelect += OnItemSelect;
 
-            TicketMenu.MouseControlsEnabled = false;
-            TicketMenu.AllowCameraMovement = true;
-            TicketMenu.SetMenuWidthOffset(80);
+            _ticketMenu.MouseControlsEnabled = false;
+            _ticketMenu.AllowCameraMovement = true;
+            _ticketMenu.SetMenuWidthOffset(80);
 
 
-            QuestioningMenu = new UIMenu("Questioning", "");
-            _MenuPool.Add(QuestioningMenu);
-            QuestioningMenu.AddItem(IllegalInVehQuestionItem = new UIMenuItem(""));
-            QuestioningMenu.AddItem(DrinkingQuestionItem = new UIMenuItem(""));
-            QuestioningMenu.AddItem(DrugsQuestionItem = new UIMenuItem(""));
-            QuestioningMenu.AddItem(SearchPermissionItem = new UIMenuItem(""));
-            QuestioningMenu.ParentMenu = TrafficStopMenu;
-            QuestioningMenu.RefreshIndex();
-            QuestioningMenu.OnItemSelect += OnItemSelect;
+            _questioningMenu = new UIMenu("Questioning", "");
+            _menuPool.Add(_questioningMenu);
+            _questioningMenu.AddItem(_illegalInVehQuestionItem = new UIMenuItem(""));
+            _questioningMenu.AddItem(_drinkingQuestionItem = new UIMenuItem(""));
+            _questioningMenu.AddItem(_drugsQuestionItem = new UIMenuItem(""));
+            _questioningMenu.AddItem(_searchPermissionItem = new UIMenuItem(""));
+            _questioningMenu.ParentMenu = _trafficStopMenu;
+            _questioningMenu.RefreshIndex();
+            _questioningMenu.OnItemSelect += OnItemSelect;
 
-            QuestioningMenu.MouseControlsEnabled = false;
-            QuestioningMenu.AllowCameraMovement = true;
-            QuestioningMenu.SetMenuWidthOffset(120);
+            _questioningMenu.MouseControlsEnabled = false;
+            _questioningMenu.AllowCameraMovement = true;
+            _questioningMenu.SetMenuWidthOffset(120);
 
-            CourtsMenu = new TabView("~b~~h~San Andreas Court");
+            _courtsMenu = new TabView("~b~~h~San Andreas Court");
 
 
             
-            CourtsMenu.AddTab(PendingResultsList = new TabSubmenuItem("Pending Results", EmptyItems));
-            CourtsMenu.AddTab(PublishedResultsList = new TabSubmenuItem("Results", EmptyItems));
+            _courtsMenu.AddTab(PendingResultsList = new TabSubmenuItem("Pending Results", EmptyItems));
+            _courtsMenu.AddTab(PublishedResultsList = new TabSubmenuItem("Results", EmptyItems));
 
-            CourtsMenu.RefreshIndex();
+            _courtsMenu.RefreshIndex();
 
             MainLogic();
         }
 
-        private static void updatePenaltyType(int index)
+        private static void UpdatePenaltyType(int index)
         {
-            if (IssueTicketItem.Collection[index].Value.ToString().Contains("Court"))
+            if (_issueTicketItem.Collection[index].Value.ToString().Contains("Court"))
             {
-                FineItem.Description = "The estimated fine. A judge will decide on the final penalty.";
-                PointsItem.Description = "The estimated number of points. A judge will decide on the final penalty.";
-                PointsItem.Enabled = false;
-                FineItem.Enabled = false;
+                _fineItem.Description = "The estimated fine. A judge will decide on the final penalty.";
+                _pointsItem.Description = "The estimated number of points. A judge will decide on the final penalty.";
+                _pointsItem.Enabled = false;
+                _fineItem.Enabled = false;
 
             }
             else
             {
-                FineItem.Description = "";
-                PointsItem.Description = "";
-                PointsItem.Enabled = true;
-                FineItem.Enabled = true;
+                _fineItem.Description = "";
+                _pointsItem.Description = "";
+                _pointsItem.Enabled = true;
+                _fineItem.Enabled = true;
             }
         }
-        private static void OnCheckboxChange(UIMenu sender, UIMenuCheckboxItem changeditem, bool check)
+/*        private static void OnCheckboxChange(UIMenu sender, UIMenuCheckboxItem changeditem, bool check)
         {
-            if (sender == PursuitTacticsMenu && changeditem == AutomaticTacticsCheckboxItem) 
-            {
-                EnhancedPursuitAI.AutomaticAI = check;
-                PursuitTacticsListItem.Enabled = !check;
-            }           
-        }
+            if (sender != _pursuitTacticsMenu || changeditem != AutomaticTacticsCheckboxItem) return;
+            EnhancedPursuitAI.AutomaticAi = check;
+            PursuitTacticsListItem.Enabled = !check;
+        }*/
 
         private static void OnIndexChange(UIMenuItem changeditem, int index)
         {
-            if (changeditem == IssueTicketItem)
+            if (changeditem == _issueTicketItem)
             {
-                updatePenaltyType(index);
+                UpdatePenaltyType(index);
             }
         }
         private static void OnItemSelect(UIMenu sender, UIMenuItem selectedItem, int index)
@@ -308,110 +293,107 @@ namespace LSPDFR_
 
             //    }
             //}
-            if (sender == TrafficStopMenu)
+            if (sender == _trafficStopMenu)
             {
-                if (selectedItem == SpeechItem)
+                if (selectedItem == _speechItem)
                 {
-                    string speech = SpeechItem.Collection[SpeechItem.Index].Value.ToString();
-                    CurrentEnhancedTrafficStop.PlaySpecificSpeech(speech);
+                    string speech = _speechItem.Collection[_speechItem.Index].Value.ToString();
+                    EnhancedTrafficStop.PlaySpecificSpeech(speech);
 
                 }
-                else if (selectedItem == IDItem)
+                else if (selectedItem == _idItem)
                 {
                     //Ask for ID
 
-                    CurrentEnhancedTrafficStop.AskForID((EnhancedTrafficStop.OccupantSelector)IDItem.Index);
+                    _currentEnhancedTrafficStop.AskForId((EnhancedTrafficStop.OccupantSelector)_idItem.Index);
 
                 }
-                else if (selectedItem == QuestionDriverItem)
+                else if (selectedItem == _questionDriverItem)
                 {
                     sender.Visible = false;
 
                     UpdateTrafficStopQuestioning();
-                    QuestioningMenu.Visible = true;
+                    _questioningMenu.Visible = true;
                 }
-                else if (selectedItem == PenaltyItem)
+                else if (selectedItem == _penaltyItem)
                 {
                     //Issue ticket(bind menu to item)?
                     sender.Visible = false;
                     //Menus.UpdateTicketReasons();
-                    updatePenaltyType(IssueTicketItem.Index);
-                    TicketMenu.Visible = true;
+                    UpdatePenaltyType(_issueTicketItem.Index);
+                    _ticketMenu.Visible = true;
                     
                 }
-                else if (selectedItem == WarningItem)
+                else if (selectedItem == _warningItem)
                 {
                     //Let driver go
-                    CurrentEnhancedTrafficStop.IssueWarning();
-                    _MenuPool.CloseAllMenus();
+                    EnhancedTrafficStop.IssueWarning();
+                    _menuPool.CloseAllMenus();
                 }
-                else if (selectedItem == OutOfVehicleItem)
+                else if (selectedItem == _outOfVehicleItem)
                 {
                     //Order driver out
-                    CurrentEnhancedTrafficStop.OutOfVehicle((EnhancedTrafficStop.OccupantSelector)OutOfVehicleItem.Index);
-                    _MenuPool.CloseAllMenus();
+                    _currentEnhancedTrafficStop.OutOfVehicle((EnhancedTrafficStop.OccupantSelector)_outOfVehicleItem.Index);
+                    _menuPool.CloseAllMenus();
                 }
             }
 
-            else if (sender == TicketMenu)
+            else if (sender == _ticketMenu)
             {
-                if (selectedItem == IssueTicketItem)
+                if (selectedItem == _issueTicketItem)
                 {
                     //Issue TOR 
                                   
-                    bool SeizeVehicle = SeizeVehicleTicketCheckboxItem.Checked;
+                    bool seizeVehicle = _seizeVehicleTicketCheckboxItem.Checked;
                     if (Functions.IsPlayerPerformingPullover())
                     {
-                        CurrentEnhancedTrafficStop.IssueTicket(SeizeVehicle);
+                        _currentEnhancedTrafficStop.IssueTicket(seizeVehicle);
                     }
                     else
                     {
-                        GameFiber.StartNew(delegate
-                        {
-                            EnhancedTrafficStop.performTicketAnimation();
-                        });
+                        GameFiber.StartNew(EnhancedTrafficStop.PerformTicketAnimation);
                     }
 
-                    _MenuPool.CloseAllMenus();
+                    _menuPool.CloseAllMenus();
                 }
                 else if (selectedItem == TicketOffenceSelectorItem)
                 {
                     sender.Visible = false;
-                    OpenOffencesMenu(sender, CurrentEnhancedTrafficStop.SelectedOffences);
+                    OpenOffencesMenu(sender, _currentEnhancedTrafficStop.SelectedOffences);
                 }
             }
-            else if (sender == QuestioningMenu)
+            else if (sender == _questioningMenu)
             {
-                if (selectedItem == IllegalInVehQuestionItem)
+                if (selectedItem == _illegalInVehQuestionItem)
                 {
-                    Game.DisplaySubtitle("~h~" + CurrentEnhancedTrafficStop.AnythingIllegalInVehAnswer);
+                    Game.DisplaySubtitle("~h~" + _currentEnhancedTrafficStop.AnythingIllegalInVehAnswer);
                 }
-                else if (selectedItem == DrinkingQuestionItem)
+                else if (selectedItem == _drinkingQuestionItem)
                 {
-                    Game.DisplaySubtitle("~h~" + CurrentEnhancedTrafficStop.DrinkingAnswer);
+                    Game.DisplaySubtitle("~h~" + _currentEnhancedTrafficStop.DrinkingAnswer);
                 }
-                else if (selectedItem == DrugsQuestionItem)
+                else if (selectedItem == _drugsQuestionItem)
                 {
-                    Game.DisplaySubtitle("~h~" + CurrentEnhancedTrafficStop.DrugsAnswer);
+                    Game.DisplaySubtitle("~h~" + _currentEnhancedTrafficStop.DrugsAnswer);
                 }
-                else if (selectedItem == SearchPermissionItem)
+                else if (selectedItem == _searchPermissionItem)
                 {
-                    Game.DisplaySubtitle("~h~" + CurrentEnhancedTrafficStop.SearchVehAnswer);
+                    Game.DisplaySubtitle("~h~" + _currentEnhancedTrafficStop.SearchVehAnswer);
                 }
                 else if (CustomQuestionsItems.Contains(selectedItem))
                 {
-                    Game.DisplaySubtitle("~h~" + CurrentEnhancedTrafficStop.CustomQuestionsWithAnswers[CustomQuestionsItems.IndexOf(selectedItem)].Item2);
+                    Game.DisplaySubtitle("~h~" + _currentEnhancedTrafficStop.CustomQuestionsWithAnswers[CustomQuestionsItems.IndexOf(selectedItem)].Item2);
                 }
                 else if (CustomQuestionsCallbacksAnswersItems.Contains(selectedItem))
                 {
-                    Game.DisplaySubtitle("~h~" + CurrentEnhancedTrafficStop.CustomQuestionsWithCallbacksAnswers[CustomQuestionsCallbacksAnswersItems.IndexOf(selectedItem)].Item2(CurrentEnhancedTrafficStop.Suspect));
+                    Game.DisplaySubtitle("~h~" + _currentEnhancedTrafficStop.CustomQuestionsWithCallbacksAnswers[CustomQuestionsCallbacksAnswersItems.IndexOf(selectedItem)].Item2(_currentEnhancedTrafficStop.Suspect));
                 }
                 else if (CustomQuestionsAnswersCallbackItems.Contains(selectedItem))
                 {
-                    string Text = CurrentEnhancedTrafficStop.CustomQuestionsAnswerWithCallbacks[CustomQuestionsAnswersCallbackItems.IndexOf(selectedItem)].Item2;
-                    Game.DisplaySubtitle("~h~" + Text);
+                    string text = _currentEnhancedTrafficStop.CustomQuestionsAnswerWithCallbacks[CustomQuestionsAnswersCallbackItems.IndexOf(selectedItem)].Item2;
+                    Game.DisplaySubtitle("~h~" + text);
 
-                    CurrentEnhancedTrafficStop.CustomQuestionsAnswerWithCallbacks[CustomQuestionsAnswersCallbackItems.IndexOf(selectedItem)].Item3(CurrentEnhancedTrafficStop.Suspect, Text);
+                    _currentEnhancedTrafficStop.CustomQuestionsAnswerWithCallbacks[CustomQuestionsAnswersCallbackItems.IndexOf(selectedItem)].Item3(_currentEnhancedTrafficStop.Suspect, text);
                 }
             }
         }
@@ -420,32 +402,30 @@ namespace LSPDFR_
         {
             if (OffenceCategoryMenus.Contains(sender))
             {
-                CurrentEnhancedTrafficStop.SelectedOffences.Clear();
+                _currentEnhancedTrafficStop.SelectedOffences.Clear();
                 foreach (UIMenu men in OffenceCategoryMenus)
                 {
                     foreach (UIMenuItem it in men.MenuItems)
                     {
-                        if (it is UIMenuCheckboxItem)
+                        if (!(it is UIMenuCheckboxItem)) continue;
+                        if (((UIMenuCheckboxItem)it).Checked)
                         {
-                            if (((UIMenuCheckboxItem)it).Checked)
-                            {
-                                CurrentEnhancedTrafficStop.SelectedOffences.Add(CheckboxItems_Offences.FirstOrDefault(x => x.Item1 == it).Item2);
-                            }
+                            _currentEnhancedTrafficStop.SelectedOffences.Add(CheckboxItems_Offences.FirstOrDefault(x => x.Item1 == it)?.Item2);
                         }
                     }
                 }
-                int fine = CurrentEnhancedTrafficStop.SelectedOffences.Sum(x => x.fine);
+                int fine = _currentEnhancedTrafficStop.SelectedOffences.Sum(x => x.fine);
                 fine = fine - (fine % 5);
                 if (fine >  5000) { fine = 5000; }
                 else if (fine < 5) { fine = 5; }
 
-                FineItem.Index = fine / 5 - 1;
-                int points = CurrentEnhancedTrafficStop.SelectedOffences.Sum(x => x.points);
-                points = points - (points % Offence.pointincstep);
-                if (points > Offence.maxpoints) { points = Offence.maxpoints; }
-                else if (points < Offence.minpoints) { points = Offence.minpoints; }
-                PointsItem.Index = PointsList.IndexOf(points.ToString());
-                SeizeVehicleTicketCheckboxItem.Checked = CurrentEnhancedTrafficStop.SelectedOffences.Any(x => x.seizeVehicle);
+                _fineItem.Index = fine / 5 - 1;
+                int points = _currentEnhancedTrafficStop.SelectedOffences.Sum(x => x.points);
+                points = points - (points % Offence.Pointincstep);
+                if (points > Offence.Maxpoints) { points = Offence.Maxpoints; }
+                else if (points < Offence.Minpoints) { points = Offence.Minpoints; }
+                _pointsItem.Index = PointsList.IndexOf(points.ToString());
+                _seizeVehicleTicketCheckboxItem.Checked = _currentEnhancedTrafficStop.SelectedOffences.Any(x => x.seizeVehicle);
 
             }
         }
@@ -459,86 +439,86 @@ namespace LSPDFR_
                     while (true)
                     {
                         GameFiber.Yield();
-                        if (EnhancedPursuitAI.InPursuit && Game.LocalPlayer.Character.IsInAnyVehicle(false))
+/*                        if (EnhancedPursuitAI.InPursuit && Game.LocalPlayer.Character.IsInAnyVehicle(false))
                         {
                             if (ExtensionMethods.IsKeyCombinationDownComputerCheck(EnhancedPursuitAI.OpenPursuitTacticsMenuKey, EnhancedPursuitAI.OpenPursuitTacticsMenuModifierKey))
                             {
-                                PursuitTacticsMenu.Visible = !PursuitTacticsMenu.Visible;
+                                _pursuitTacticsMenu.Visible = !_pursuitTacticsMenu.Visible;
                             }
                         }
                         else
                         {
-                            PursuitTacticsMenu.Visible = false;
-                        }
+                            _pursuitTacticsMenu.Visible = false;
+                        }*/
 
                         if (Functions.IsPlayerPerformingPullover())
                         {
-                            if (Functions.GetPulloverSuspect(Functions.GetCurrentPullover()) != CurrentEnhancedTrafficStop.Suspect)
+                            if (Functions.GetPulloverSuspect(Functions.GetCurrentPullover()) != _currentEnhancedTrafficStop.Suspect)
                             {
-                                CurrentEnhancedTrafficStop = new EnhancedTrafficStop();
+                                _currentEnhancedTrafficStop = new EnhancedTrafficStop();
 
-                                StatisticsCounter.AddCountToStatistic("Traffic Stops", "LSPDFR+");
+                                //StatisticsCounter.AddCountToStatistic("Traffic Stops", "LSPDFR+");
                                 Game.LogTrivial("Adding traffic stop count - LSPDFR+");
                                 API.Functions.OnTrafficStopInitiated(Functions.GetPulloverSuspect(Functions.GetCurrentPullover()));
 
                             }
                         }
                         //Shift Q ticket menu handler.
-                        else if (!_MenuPool.IsAnyMenuOpen() && !Game.LocalPlayer.Character.IsInAnyVehicle(false) && ExtensionMethods.IsKeyCombinationDownComputerCheck(Offence.OpenTicketMenuKey, Offence.OpenTicketMenuModifierKey)
+                        else if (!_menuPool.IsAnyMenuOpen() && !Game.LocalPlayer.Character.IsInAnyVehicle(false) && ExtensionMethods.IsKeyCombinationDownComputerCheck(Offence.OpenTicketMenuKey, Offence.OpenTicketMenuModifierKey)
                         && Game.LocalPlayer.Character.GetNearbyPeds(1)[0].Exists() && Game.LocalPlayer.Character.DistanceTo(Game.LocalPlayer.Character.GetNearbyPeds(1)[0]) < 5f)
                         {
 
                             Game.LocalPlayer.Character.Tasks.ClearImmediately();
-                            _MenuPool.ResetMenus(true, true);
-                            CurrentEnhancedTrafficStop.SelectedOffences.Clear();
-                            SeizeVehicleTicketCheckboxItem.Enabled = false;
-                            TicketMenu.ParentMenu = null;
+                            _menuPool.ResetMenus(true, true);
+                            _currentEnhancedTrafficStop.SelectedOffences.Clear();
+                            _seizeVehicleTicketCheckboxItem.Enabled = false;
+                            _ticketMenu.ParentMenu = null;
                             foreach (UIMenu m in OffenceCategoryMenus)
                             {
                                 m.Visible = false;
                             }
-                            TicketMenu.Visible = true;
+                            _ticketMenu.Visible = true;
                         }
 
-                        if (!LSPDFRPlusHandler.BritishPolicingScriptRunning && ExtensionMethods.IsKeyDownComputerCheck(CourtSystem.OpenCourtMenuKey) && (ExtensionMethods.IsKeyDownRightNowComputerCheck(CourtSystem.OpenCourtMenuModifierKey) || CourtSystem.OpenCourtMenuModifierKey == Keys.None))
+                        if (ExtensionMethods.IsKeyDownComputerCheck(CourtSystem.OpenCourtMenuKey) && (ExtensionMethods.IsKeyDownRightNowComputerCheck(CourtSystem.OpenCourtMenuModifierKey) || CourtSystem.OpenCourtMenuModifierKey == Keys.None))
                         {
-                            if (!CourtsMenu.Visible) { CourtsMenu.Visible = true; }
+                            if (!_courtsMenu.Visible) { _courtsMenu.Visible = true; }
                         }
 
-                        if (_MenuPool.IsAnyMenuOpen()) { NativeFunction.Natives.SET_PED_STEALTH_MOVEMENT(Game.LocalPlayer.Character, 0, 0); }
+                        if (_menuPool.IsAnyMenuOpen()) { NativeFunction.Natives.SET_PED_STEALTH_MOVEMENT(Game.LocalPlayer.Character, 0, 0); }
 
                         //Prevent the traffic stop menu from being used when it shouldn't be.
-                        if (TrafficStopMenu.Visible)
+                        if (_trafficStopMenu.Visible)
                         {                           
                             if (!Functions.IsPlayerPerformingPullover())
                             {
-                                if (TrafficStopMenuEnabled)
+                                if (_trafficStopMenuEnabled)
                                 {
-                                    ToggleUIMenuEnabled(TrafficStopMenu, false);
-                                    TrafficStopMenuEnabled = false;
+                                    ToggleUiMenuEnabled(_trafficStopMenu, false);
+                                    _trafficStopMenuEnabled = false;
                                 }
                             }
                             else if (Vector3.Distance2D(Game.LocalPlayer.Character.Position, Functions.GetPulloverSuspect(Functions.GetCurrentPullover()).Position) > TrafficStopMenuDistance)
                             {
-                                if (TrafficStopMenuEnabled)
+                                if (_trafficStopMenuEnabled)
                                 {
-                                    ToggleUIMenuEnabled(TrafficStopMenu, false);
-                                    TrafficStopMenuEnabled = false;
+                                    ToggleUiMenuEnabled(_trafficStopMenu, false);
+                                    _trafficStopMenuEnabled = false;
                                 }
                             }
-                            else if (!TrafficStopMenuEnabled)
+                            else if (!_trafficStopMenuEnabled)
                             {
-                                ToggleUIMenuEnabled(TrafficStopMenu, true);
-                                TrafficStopMenuEnabled = true;
+                                ToggleUiMenuEnabled(_trafficStopMenu, true);
+                                _trafficStopMenuEnabled = true;
                             }
                         }
 
-                        if (CourtsMenu.Visible)
+                        if (_courtsMenu.Visible)
                         {
 
-                            if (!CourtsMenuPaused)
+                            if (!_courtsMenuPaused)
                             {
-                                CourtsMenuPaused = true;
+                                _courtsMenuPaused = true;
                                 Game.IsPaused = true;
                             }
                             if (ExtensionMethods.IsKeyDownComputerCheck(Keys.Delete))
@@ -562,27 +542,21 @@ namespace LSPDFR_
                                 }
                             }
 
-                            if (ExtensionMethods.IsKeyDownComputerCheck(Keys.Insert))
-                            {
-                                if (PendingResultsList.Active)
-                                {
-                                    if (CourtCase.PendingResultsMenuCleared)
-                                    {
-                                        CourtSystem.PendingCourtCases[PendingResultsList.Index].ResultsPublishTime = DateTime.Now;
-                                        PendingResultsList.Index = 0;
-                                    }
-                                }
-                            }
+                            if (!ExtensionMethods.IsKeyDownComputerCheck(Keys.Insert)) continue;
+                            if (!PendingResultsList.Active) continue;
+                            if (!CourtCase.PendingResultsMenuCleared) continue;
+                            CourtSystem.PendingCourtCases[PendingResultsList.Index].ResultsPublishTime = DateTime.Now;
+                            PendingResultsList.Index = 0;
                         }
-                        else if (CourtsMenuPaused)
+                        else if (_courtsMenuPaused)
                         {
-                            CourtsMenuPaused = false;
+                            _courtsMenuPaused = false;
                             Game.IsPaused = false;
                         }
 
                     }
                 }
-                catch (System.Threading.ThreadAbortException e) { }
+                catch (ThreadAbortException) { }
                 catch (Exception e) { Game.LogTrivial(e.ToString()); }
             });
         }
@@ -590,84 +564,80 @@ namespace LSPDFR_
         //Huge method to handle the traffic stop questioning layout.
         public static void UpdateTrafficStopQuestioning()
         {
-            if (Functions.IsPlayerPerformingPullover())
+            if (!Functions.IsPlayerPerformingPullover()) return;
+            _currentEnhancedTrafficStop.UpdateTrafficStopQuestioning();
+            ToggleStandardQuestions(_currentEnhancedTrafficStop.StandardQuestionsEnabled);
+            if (_currentEnhancedTrafficStop.StandardQuestionsEnabled)
             {
-                CurrentEnhancedTrafficStop.UpdateTrafficStopQuestioning();
-                ToggleStandardQuestions(CurrentEnhancedTrafficStop.StandardQuestionsEnabled);
-                if (CurrentEnhancedTrafficStop.StandardQuestionsEnabled)
+                _illegalInVehQuestionItem.Text = _currentEnhancedTrafficStop.AnythingIllegalInVehQuestion;
+                _drinkingQuestionItem.Text = _currentEnhancedTrafficStop.DrinkingQuestion;
+                _drugsQuestionItem.Text = _currentEnhancedTrafficStop.DrugsQuestion;
+                _searchPermissionItem.Text = _currentEnhancedTrafficStop.SearchVehQuestion;
+            }
+            if (CustomQuestionsItems.Count > 0)
+            {
+                foreach (UIMenuItem item in _questioningMenu.MenuItems.ToArray())
                 {
-                    IllegalInVehQuestionItem.Text = CurrentEnhancedTrafficStop.AnythingIllegalInVehQuestion;
-                    DrinkingQuestionItem.Text = CurrentEnhancedTrafficStop.DrinkingQuestion;
-                    DrugsQuestionItem.Text = CurrentEnhancedTrafficStop.DrugsQuestion;
-                    SearchPermissionItem.Text = CurrentEnhancedTrafficStop.SearchVehQuestion;
-                }
-                if (CustomQuestionsItems.Count > 0)
-                {
-                    foreach (UIMenuItem item in QuestioningMenu.MenuItems.ToArray())
+                    if (CustomQuestionsItems.Contains(item))
                     {
-                        if (CustomQuestionsItems.Contains(item))
-                        {
-                            QuestioningMenu.RemoveItemAt(QuestioningMenu.MenuItems.IndexOf(item));
-                        }
+                        _questioningMenu.RemoveItemAt(_questioningMenu.MenuItems.IndexOf(item));
                     }
-                    CustomQuestionsItems.Clear();
                 }
-                foreach (Tuple<string, string> tuple in CurrentEnhancedTrafficStop.CustomQuestionsWithAnswers)
-                {
-                    UIMenuItem customquestionitem = new UIMenuItem(tuple.Item1);
-                    QuestioningMenu.AddItem(customquestionitem);
-                    CustomQuestionsItems.Add(customquestionitem);
+                CustomQuestionsItems.Clear();
+            }
+            foreach (Tuple<string, string> tuple in _currentEnhancedTrafficStop.CustomQuestionsWithAnswers)
+            {
+                UIMenuItem customquestionitem = new UIMenuItem(tuple.Item1);
+                _questioningMenu.AddItem(customquestionitem);
+                CustomQuestionsItems.Add(customquestionitem);
 
-                }
-                if (CustomQuestionsCallbacksAnswersItems.Count > 0)
+            }
+            if (CustomQuestionsCallbacksAnswersItems.Count > 0)
+            {
+                foreach (UIMenuItem item in _questioningMenu.MenuItems.ToArray())
                 {
-                    foreach (UIMenuItem item in QuestioningMenu.MenuItems.ToArray())
+                    if (CustomQuestionsCallbacksAnswersItems.Contains(item))
                     {
-                        if (CustomQuestionsCallbacksAnswersItems.Contains(item))
-                        {
-                            QuestioningMenu.RemoveItemAt(QuestioningMenu.MenuItems.IndexOf(item));
-                        }
+                        _questioningMenu.RemoveItemAt(_questioningMenu.MenuItems.IndexOf(item));
                     }
-                    CustomQuestionsCallbacksAnswersItems.Clear();
                 }
-                foreach (Tuple<string, Func<Ped, string>> tuple in CurrentEnhancedTrafficStop.CustomQuestionsWithCallbacksAnswers)
-                {
-                    UIMenuItem customquestionitem = new UIMenuItem(tuple.Item1);
-                    QuestioningMenu.AddItem(customquestionitem);
-                    CustomQuestionsCallbacksAnswersItems.Add(customquestionitem);
+                CustomQuestionsCallbacksAnswersItems.Clear();
+            }
+            foreach (Tuple<string, Func<Ped, string>> tuple in _currentEnhancedTrafficStop.CustomQuestionsWithCallbacksAnswers)
+            {
+                UIMenuItem customquestionitem = new UIMenuItem(tuple.Item1);
+                _questioningMenu.AddItem(customquestionitem);
+                CustomQuestionsCallbacksAnswersItems.Add(customquestionitem);
 
-                }
+            }
 
-                if (CustomQuestionsAnswersCallbackItems.Count > 0)
+            if (CustomQuestionsAnswersCallbackItems.Count > 0)
+            {
+                foreach (UIMenuItem item in _questioningMenu.MenuItems.ToArray())
                 {
-                    foreach (UIMenuItem item in QuestioningMenu.MenuItems.ToArray())
+                    if (CustomQuestionsAnswersCallbackItems.Contains(item))
                     {
-                        if (CustomQuestionsAnswersCallbackItems.Contains(item))
-                        {
-                            QuestioningMenu.RemoveItemAt(QuestioningMenu.MenuItems.IndexOf(item));
-                        }
+                        _questioningMenu.RemoveItemAt(_questioningMenu.MenuItems.IndexOf(item));
                     }
-                    CustomQuestionsAnswersCallbackItems.Clear();
                 }
-                foreach (Tuple<string,string, Action<Ped, string>> tuple in CurrentEnhancedTrafficStop.CustomQuestionsAnswerWithCallbacks)
-                {
-                    UIMenuItem customquestionitem = new UIMenuItem(tuple.Item1);
-                    QuestioningMenu.AddItem(customquestionitem);
-                    CustomQuestionsAnswersCallbackItems.Add(customquestionitem);
-
-                }
-
+                CustomQuestionsAnswersCallbackItems.Clear();
+            }
+            foreach (Tuple<string,string, Action<Ped, string>> tuple in _currentEnhancedTrafficStop.CustomQuestionsAnswerWithCallbacks)
+            {
+                UIMenuItem customquestionitem = new UIMenuItem(tuple.Item1);
+                _questioningMenu.AddItem(customquestionitem);
+                CustomQuestionsAnswersCallbackItems.Add(customquestionitem);
 
             }
         }
         public static float TrafficStopMenuDistance = 3.7f;
-        private static EnhancedTrafficStop CurrentEnhancedTrafficStop = new EnhancedTrafficStop();
-        private static bool CourtsMenuPaused = false;
+        private static EnhancedTrafficStop _currentEnhancedTrafficStop = new EnhancedTrafficStop();
+        private static bool _courtsMenuPaused;
         private static void Process(object sender, GraphicsEventArgs e)
         {
             try
             {
-                if (Functions.IsPlayerPerformingPullover() && !_MenuPool.IsAnyMenuOpen() && EnhancedTrafficStop.EnhancedTrafficStopsEnabled)
+                if (Functions.IsPlayerPerformingPullover() && !_menuPool.IsAnyMenuOpen() && EnhancedTrafficStop.EnhancedTrafficStopsEnabled)
                 {
                     Ped pulloverSuspect = Functions.GetPulloverSuspect(Functions.GetCurrentPullover());
                     if (pulloverSuspect &&
@@ -680,26 +650,24 @@ namespace LSPDFR_
 
                         if (ExtensionMethods.IsKeyDownComputerCheck(EnhancedTrafficStop.BringUpTrafficStopMenuKey) || Game.IsControllerButtonDown(EnhancedTrafficStop.BringUpTrafficStopMenuControllerButton))
                         {
-                            _MenuPool.ResetMenus(true, true);
-                            SeizeVehicleTicketCheckboxItem.Enabled = true;
-                            TicketMenu.ParentMenu = TrafficStopMenu;
-                            TicketMenu.Visible = false;
+                            _menuPool.ResetMenus(true, true);
+                            _seizeVehicleTicketCheckboxItem.Enabled = true;
+                            _ticketMenu.ParentMenu = _trafficStopMenu;
+                            _ticketMenu.Visible = false;
                             foreach (UIMenu m in OffenceCategoryMenus)
                             {
                                 m.Visible = false;
                             }
-                            TrafficStopMenu.Visible = true;
+                            _trafficStopMenu.Visible = true;
 
                         }
                     }
                 }
 
-                _MenuPool.ProcessMenus();
-                if (CourtsMenu.Visible)
-                {
-                    Game.IsPaused = true;
-                    CourtsMenu.Update();
-                }
+                _menuPool.ProcessMenus();
+                if (!_courtsMenu.Visible) return;
+                Game.IsPaused = true;
+                _courtsMenu.Update();
             }
             catch (Exception exception)
             {
@@ -708,7 +676,7 @@ namespace LSPDFR_
            
         }
 
-        private static void ToggleUIMenuEnabled(UIMenu menu, bool Enabled)
+        private static void ToggleUiMenuEnabled(UIMenu menu, bool Enabled)
         {
 
             foreach (UIMenuItem item in menu.MenuItems)

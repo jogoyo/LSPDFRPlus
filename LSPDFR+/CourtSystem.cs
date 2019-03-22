@@ -1,14 +1,14 @@
-﻿using LSPD_First_Response.Engine.Scripting.Entities;
-using Rage;
-using RAGENativeUI.PauseMenu;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Threading;
 using System.Windows.Forms;
 using System.Xml.Linq;
+using Albo1125.Common.CommonLibrary;
+using LSPD_First_Response.Engine.Scripting.Entities;
+using Rage;
+using RAGENativeUI.PauseMenu;
 
 namespace LSPDFR_
 {
@@ -16,187 +16,191 @@ namespace LSPDFR_
     {
         public static Keys OpenCourtMenuKey = Keys.F9;
         public static Keys OpenCourtMenuModifierKey = Keys.None;
-        public static List<CourtCase> PendingCourtCases = new List<CourtCase>();
-        public static List<CourtCase> PublishedCourtCases = new List<CourtCase>();
-        public static string CourtCaseFilePath = "Plugins/LSPDFR/LSPDFR+/CourtCases.xml";
-        public static bool LoadingXMLFileCases = true;
+        public static readonly List<CourtCase> PendingCourtCases = new List<CourtCase>();
+        public static readonly List<CourtCase> PublishedCourtCases = new List<CourtCase>();
+        private const string CourtCaseFilePath = "Plugins/LSPDFR/LSPDFR+/CourtCases.xml";
+        public static bool LoadingXmlFileCases = true;
         public static bool RealisticCourtDates = true;
+
         public static void CourtSystemMainLogic()
         {
-            if (!LSPDFRPlusHandler.BritishPolicingScriptRunning)
+            GameFiber.StartNew(delegate
             {
-                GameFiber.StartNew(delegate
+                Directory.CreateDirectory(Directory.GetParent(CourtCaseFilePath).FullName);
+                if (!File.Exists(CourtCaseFilePath))
                 {
-                    Directory.CreateDirectory(Directory.GetParent(CourtCaseFilePath).FullName);
-                    if (!File.Exists(CourtCaseFilePath))
-                    {
-                        new XDocument(
+                    new XDocument(
                             new XElement("LSPDFRPlus")
                         )
                         .Save(CourtCaseFilePath);
-                    }
-                    LoadCourtCasesFromXMLFile(CourtCaseFilePath);
-                    while (true)
-                    {
-                        GameFiber.Yield();
-                        foreach (CourtCase ccase in PendingCourtCases.ToArray())
-                        {
-                            ccase.CheckForCaseUpdatedStatus();
-                        }
+                }
 
+                LoadCourtCasesFromXmlFile(CourtCaseFilePath);
+                while (true)
+                {
+                    GameFiber.Yield();
+                    foreach (CourtCase ccase in PendingCourtCases.ToArray())
+                    {
+                        ccase.CheckForCaseUpdatedStatus();
                     }
-                });
-            }
+                }
+            });
         }
 
-        private static void LoadCourtCasesFromXMLFile(string File)
+        private static void LoadCourtCasesFromXmlFile(string File)
         {
             try
             {
                 XDocument xdoc = XDocument.Load(File);
-                char[] trim = new char[] { '\'', '\"', ' ' };
-                List<CourtCase> AllCourtCases = xdoc.Descendants("CourtCase").Select(x => new CourtCase()
+                char[] trim = {'\'', '\"', ' '};
+                List<CourtCase> allCourtCases = xdoc.Descendants("CourtCase").Select(x => new CourtCase
                 {
-                    SuspectName = ((string)x.Element("SuspectName").Value).Trim(trim),
-                    SuspectDOB = DateTime.FromBinary(long.Parse(x.Element("SuspectDOB").Value)),
-                    Crime = ((string)x.Element("Crime").Value).Trim(trim),
-                    CrimeDate = DateTime.FromBinary(long.Parse(x.Element("CrimeDate").Value)),
-                    GuiltyChance = int.Parse(x.Element("GuiltyChance") != null ?  ((string)x.Element("GuiltyChance").Value).Trim(trim) : "100"),
-                    CourtVerdict = ((string)x.Element("CourtVerdict").Value).Trim(trim),
-                    ResultsPublishTime = DateTime.FromBinary(long.Parse(x.Element("ResultsPublishTime").Value)),
-                    ResultsPublished = bool.Parse(((string)x.Element("Published").Value).Trim(trim)),
-                    ResultsPublishedNotificationShown = bool.Parse(((string)x.Element("ResultsPublishedNotificationShown").Value).Trim(trim))
+                    SuspectName = x.Element("SuspectName")?.Value.Trim(trim),
+                    SuspectDob = DateTime.FromBinary(long.Parse(x.Element("SuspectDOB")?.Value)),
+                    Crime = x.Element("Crime")?.Value.Trim(trim),
+                    CrimeDate = DateTime.FromBinary(long.Parse(x.Element("CrimeDate")?.Value)),
+                    GuiltyChance = int.Parse(x.Element("GuiltyChance") != null
+                        ? x.Element("GuiltyChance")?.Value.Trim(trim)
+                        : "100"),
+                    CourtVerdict = x.Element("CourtVerdict")?.Value.Trim(trim),
+                    ResultsPublishTime = DateTime.FromBinary(long.Parse(x.Element("ResultsPublishTime")?.Value)),
+                    ResultsPublished = bool.Parse(x.Element("Published")?.Value.Trim(trim)),
+                    ResultsPublishedNotificationShown =
+                        bool.Parse(x.Element("ResultsPublishedNotificationShown")?.Value.Trim(trim))
+                }).ToList();
 
-                }).ToList<CourtCase>();
-
-                foreach (CourtCase courtcase in AllCourtCases)
+                foreach (CourtCase courtcase in allCourtCases)
                 {
                     courtcase.AddToCourtsMenuAndLists();
                 }
-
             }
-            catch (System.Threading.ThreadAbortException e) { }
+            catch (ThreadAbortException)
+            {
+            }
             catch (Exception e)
             {
-                Game.LogTrivial("LSPDFR+ encountered an exception reading \'" + File + "\'. It was: " + e.ToString());
+                Game.LogTrivial("LSPDFR+ encountered an exception reading \'" + File + "\'. It was: " + e);
                 Game.DisplayNotification("~r~LSPDFR+: Error reading CourtCases.xml. Setting default values.");
             }
             finally
             {
-                LoadingXMLFileCases = false;
+                LoadingXmlFileCases = false;
             }
-
-
         }
+
         public static void OverwriteCourtCase(CourtCase CourtCase)
         {
-            DeleteCourtCaseFromXMLFile(CourtCaseFilePath, CourtCase);
-            AddCourtCaseToXMLFile(CourtCaseFilePath, CourtCase);
+            DeleteCourtCaseFromXmlFile(CourtCaseFilePath, CourtCase);
+            AddCourtCaseToXmlFile(CourtCaseFilePath, CourtCase);
         }
+
         public static void DeleteCourtCase(CourtCase CourtCase)
         {
-            DeleteCourtCaseFromXMLFile(CourtCaseFilePath, CourtCase);
-            if (CourtSystem.PublishedCourtCases.Contains(CourtCase))
+            DeleteCourtCaseFromXmlFile(CourtCaseFilePath, CourtCase);
+            if (PublishedCourtCases.Contains(CourtCase))
             {
-                if (Menus.PublishedResultsList.Items.Count == 1) { Menus.PublishedResultsList.Items.Add(new TabItem(" ")); CourtCase.ResultsMenuCleared = false; }
-                Menus.PublishedResultsList.Items.RemoveAt(CourtSystem.PublishedCourtCases.IndexOf(CourtCase));
-                CourtSystem.PublishedCourtCases.Remove(CourtCase);
+                if (Menus.PublishedResultsList.Items.Count == 1)
+                {
+                    Menus.PublishedResultsList.Items.Add(new TabItem(" "));
+                    CourtCase.ResultsMenuCleared = false;
+                }
 
+                Menus.PublishedResultsList.Items.RemoveAt(PublishedCourtCases.IndexOf(CourtCase));
+                PublishedCourtCases.Remove(CourtCase);
             }
-            if (CourtSystem.PendingCourtCases.Contains(CourtCase))
-            {
-                if (Menus.PendingResultsList.Items.Count == 1) { Menus.PendingResultsList.Items.Add(new TabItem(" ")); CourtCase.PendingResultsMenuCleared = false; }
-                Menus.PendingResultsList.Items.RemoveAt(CourtSystem.PendingCourtCases.IndexOf(CourtCase));
-                CourtSystem.PendingCourtCases.Remove(CourtCase);
 
+            if (PendingCourtCases.Contains(CourtCase))
+            {
+                if (Menus.PendingResultsList.Items.Count == 1)
+                {
+                    Menus.PendingResultsList.Items.Add(new TabItem(" "));
+                    CourtCase.PendingResultsMenuCleared = false;
+                }
+
+                Menus.PendingResultsList.Items.RemoveAt(PendingCourtCases.IndexOf(CourtCase));
+                PendingCourtCases.Remove(CourtCase);
             }
         }
 
-        private static void AddCourtCaseToXMLFile(string File, CourtCase ccase)
+        private static void AddCourtCaseToXmlFile(string File, CourtCase ccase)
         {
             try
             {
-
                 XDocument xdoc = XDocument.Load(File);
-                char[] trim = new char[] { '\'', '\"', ' ' };
-
-
-                XElement LSPDFRPlusElement = xdoc.Element("LSPDFRPlus");
-                XElement CcaseElement = new XElement("CourtCase",
-                    new XAttribute("ID", ccase.XMLIdentifier),
+                XElement lspdfrPlusElement = xdoc.Element("LSPDFRPlus");
+                XElement ccaseElement = new XElement("CourtCase",
+                    new XAttribute("ID", ccase.XmlIdentifier),
                     new XElement("SuspectName", ccase.SuspectName),
-                    new XElement("SuspectDOB", ccase.SuspectDOB.ToBinary()),
+                    new XElement("SuspectDOB", ccase.SuspectDob.ToBinary()),
                     new XElement("Crime", ccase.Crime),
                     new XElement("CrimeDate", ccase.CrimeDate.ToBinary()),
                     new XElement("GuiltyChance", ccase.GuiltyChance.ToString()),
                     new XElement("CourtVerdict", ccase.CourtVerdict),
                     new XElement("ResultsPublishTime", ccase.ResultsPublishTime.ToBinary()),
                     new XElement("Published", ccase.ResultsPublished.ToString()),
-                    new XElement("ResultsPublishedNotificationShown", ccase.ResultsPublishedNotificationShown.ToString()));
-                LSPDFRPlusElement.Add(CcaseElement);
+                    new XElement("ResultsPublishedNotificationShown",
+                        ccase.ResultsPublishedNotificationShown.ToString()));
+                lspdfrPlusElement?.Add(ccaseElement);
                 xdoc.Save(File);
-
-
             }
             catch (Exception e)
             {
-                Game.LogTrivial("LSPDFR+ encountered an exception writing a court case to \'" + File + "\'. It was: " + e.ToString());
+                Game.LogTrivial("LSPDFR+ encountered an exception writing a court case to \'" + File + "\'. It was: " +
+                                e);
                 Game.DisplayNotification("~r~LSPDFR+: Error while working with CourtCases.xml.");
             }
         }
 
-        private static void DeleteCourtCaseFromXMLFile(string File, CourtCase ccase)
+        private static void DeleteCourtCaseFromXmlFile(string File, CourtCase ccase)
         {
             try
             {
                 XDocument xdoc = XDocument.Load(File);
-                char[] trim = new char[] { '\'', '\"', ' ' };
-                List<XElement> CourtCasesToBeDeleted = new List<XElement>();
-                CourtCasesToBeDeleted = (from x in xdoc.Descendants("CourtCase") where (((string)x.Attribute("ID")).Trim(trim) == ccase.XMLIdentifier) select x).ToList<XElement>();
+                char[] trim = {'\'', '\"', ' '};
+                List<XElement> courtCasesToBeDeleted = (from x in xdoc.Descendants("CourtCase")
+                    where (((string) x.Attribute("ID")).Trim(trim) == ccase.XmlIdentifier)
+                    select x).ToList();
 
-                if (CourtCasesToBeDeleted.Count > 0)
+                if (courtCasesToBeDeleted.Count > 0)
                 {
-
-
-                    foreach (XElement ele in CourtCasesToBeDeleted)
+                    foreach (XElement ele in courtCasesToBeDeleted)
                     {
-
-
-
                         ele.Remove();
-
-
                     }
-
-
                 }
+
                 xdoc.Save(File);
             }
             catch (Exception e)
             {
-                Game.LogTrivial("LSPDFR+ encountered an exception deleting an element from \'" + File + "\'. It was: " + e.ToString());
+                Game.LogTrivial("LSPDFR+ encountered an exception deleting an element from \'" + File + "\'. It was: " +
+                                e);
                 Game.DisplayNotification("~r~LSPDFR+: Error while working with CourtCases.xml.");
             }
         }
-        public static void CreateNewCourtCase(string SuspectName, DateTime SuspectDOB, string Crime, DateTime CrimeDate, int GuiltyChance, string CourtVerdict, DateTime ResultsPublishTime, bool Published, bool ResultsPublishedNotificationShown)
+
+        private static void CreateNewCourtCase(string SuspectName, DateTime SuspectDob, string Crime,
+            DateTime CrimeDate, int GuiltyChance, string CourtVerdict, DateTime ResultsPublishTime, bool Published,
+            bool ResultsPublishedNotificationShown)
         {
-
-            CourtCase courtcase = new CourtCase(SuspectName, SuspectDOB, Crime, CrimeDate, GuiltyChance, CourtVerdict, ResultsPublishTime, Published, ResultsPublishedNotificationShown);
+            CourtCase courtcase = new CourtCase(SuspectName, SuspectDob, Crime, CrimeDate, GuiltyChance, CourtVerdict,
+                ResultsPublishTime, Published, ResultsPublishedNotificationShown);
             //Game.LogTrivial("ResultsPublishTime: " + ResultsPublishTime.ToString());
-            AddCourtCaseToXMLFile(CourtCaseFilePath, courtcase);
+            AddCourtCaseToXmlFile(CourtCaseFilePath, courtcase);
             courtcase.AddToCourtsMenuAndLists();
-
-
         }
 
-        public static void CreateNewCourtCase(string SuspectName, DateTime SuspectDOB, string Crime, DateTime CrimeDate, int GuiltyChance, string CourtVerdict, DateTime ResultsPublishTime, bool Published)
+        public static void CreateNewCourtCase(string SuspectName, DateTime SuspectDob, string Crime, DateTime CrimeDate,
+            int GuiltyChance, string CourtVerdict, DateTime ResultsPublishTime, bool Published)
         {
-            CreateNewCourtCase(SuspectName, SuspectDOB, Crime, CrimeDate, GuiltyChance, CourtVerdict, ResultsPublishTime, Published, false);
+            CreateNewCourtCase(SuspectName, SuspectDob, Crime, CrimeDate, GuiltyChance, CourtVerdict,
+                ResultsPublishTime, Published, false);
         }
 
         public static void CreateNewCourtCase(Persona Defendant, string Crime, int GuiltyChance, string CourtVerdict)
         {
-            CreateNewCourtCase(Defendant.FullName, Defendant.Birthday, Crime, DateTime.Now, GuiltyChance, CourtVerdict, DetermineCourtHearingDate(), false);
+            CreateNewCourtCase(Defendant.FullName, Defendant.Birthday, Crime, DateTime.Now, GuiltyChance, CourtVerdict,
+                DetermineCourtHearingDate(), false);
         }
         //public static void CreateNewCourtCase(Persona Defendant, EnhancedTrafficStop.TrafficOffences TrafficOffence)
         //{
@@ -212,29 +216,21 @@ namespace LSPDFR_
         //    CreateNewCourtCase(fullname, Defendant.BirthDay, crime, now, GuiltyPlea, sentence, Hearingdate, false, false);
         //}
 
-        public static bool DeterminePleadGuilty()
-        {
-            return LSPDFRPlusHandler.rnd.Next(10) < 7;
-        }
-
         public static string DeterminePrisonSentence(int MinMonths, int MaxMonths, int SuspendedChance)
         {
+            string verdict;
 
-            
-            string penaltyUnits = "months";
-            string verdict = "";
-
-
-            float Months = LSPDFRPlusHandler.rnd.Next(MinMonths, MaxMonths + 1);
-            if (Months < 1)
+            float months = LSPDFRPlusHandler.Rnd.Next(MinMonths, MaxMonths + 1);
+            if (months < 1)
             {
                 verdict = "Discharged.";
             }
             else
             {
-                if (Months % 12 == 0 || Months % 12 == 6)
+                string penaltyUnits;
+                if (months % 12 == 0 || months % 12 == 6)
                 {
-                    Months = Months / 12;
+                    months = months / 12;
                     penaltyUnits = "years";
                 }
                 else
@@ -242,26 +238,31 @@ namespace LSPDFR_
                     penaltyUnits = "months";
                 }
 
-                verdict = "Sentenced to " + Months + " " + penaltyUnits + " in prison";
+                verdict = "Sentenced to " + months + " " + penaltyUnits + " in prison";
 
-                if (LSPDFRPlusHandler.rnd.Next(100) < SuspendedChance)
+                if (LSPDFRPlusHandler.Rnd.Next(100) < SuspendedChance)
                 {
-                    verdict += ", suspended for " + LSPDFRPlusHandler.rnd.Next(12, 25) + " months.";
+                    verdict += ", suspended for " + LSPDFRPlusHandler.Rnd.Next(12, 25) + " months.";
                 }
-
             }
 
 
             return verdict;
-
         }
 
         public static string DetermineFineSentence(int MinFine, int MaxFine)
         {
-            int Fine = (int)Math.Round(((float)LSPDFRPlusHandler.rnd.Next(MinFine, MaxFine + 1)) / 5.0f) * 5;
-            if (Fine < MinFine) { Fine = MinFine; }
-            else if (Fine > MaxFine) { Fine = MaxFine; }
-            return "Fined $" + Fine + ".";
+            int fine = (int) Math.Round(LSPDFRPlusHandler.Rnd.Next(MinFine, MaxFine + 1) / 5.0f) * 5;
+            if (fine < MinFine)
+            {
+                fine = MinFine;
+            }
+            else if (fine > MaxFine)
+            {
+                fine = MaxFine;
+            }
+
+            return "Fined $" + fine + ".";
         }
 
 
@@ -305,7 +306,6 @@ namespace LSPDFR_
 
         //    }
 
-            
 
         //    else if (Offence == EnhancedTrafficStop.TrafficOffences.NoInsurance)
         //    {
@@ -328,82 +328,82 @@ namespace LSPDFR_
 
         public static DateTime DetermineCourtHearingDate()
         {
-            if (RealisticCourtDates)
+            if (!RealisticCourtDates) return DateTime.Now.AddMinutes(LSPDFRPlusHandler.Rnd.Next(2, 10));
+            DateTime courtDate = DateTime.Now;
+            int minutes = (int) Math.Round(courtDate.Minute / 5.0f) * 5;
+            while (courtDate.Minute != minutes)
             {
-                DateTime CourtDate = DateTime.Now;
-                int Minutes = (int)Math.Round(((float)CourtDate.Minute) / 5.0f) * 5;
-                while (CourtDate.Minute != Minutes)
-                {
-                    CourtDate = CourtDate.AddMinutes(1);
-                    Minutes = (int)Math.Round(((float)CourtDate.Minute) / 5.0f) * 5;
-                }
-                while (CourtDate.Hour > 17 || CourtDate.Hour < 9)
-                {
-                    CourtDate = CourtDate.AddHours(LSPDFRPlusHandler.rnd.Next(1, 8));
-                }
-
-
-                CourtDate = CourtDate.AddDays(LSPDFRPlusHandler.rnd.Next(1, 4));
-                //Game.LogTrivial("DeterminedResultsPublishTime: " + CourtDate.ToString());
-
-                return CourtDate;
+                courtDate = courtDate.AddMinutes(1);
+                minutes = (int) Math.Round(courtDate.Minute / 5.0f) * 5;
             }
-            else
+
+            while (courtDate.Hour > 17 || courtDate.Hour < 9)
             {
-                return DateTime.Now.AddMinutes(LSPDFRPlusHandler.rnd.Next(2, 10));
+                courtDate = courtDate.AddHours(LSPDFRPlusHandler.Rnd.Next(1, 8));
             }
+
+
+            courtDate = courtDate.AddDays(LSPDFRPlusHandler.Rnd.Next(1, 4));
+            //Game.LogTrivial("DeterminedResultsPublishTime: " + CourtDate.ToString());
+
+            return courtDate;
+
         }
-
     }
 
     internal class CourtCase
     {
         public string SuspectName;
-        public DateTime SuspectDOB;
+        public DateTime SuspectDob;
         public string Crime;
         public DateTime CrimeDate;
         public int GuiltyChance;
         public string CourtVerdict;
         public DateTime ResultsPublishTime;
         public bool ResultsPublished;
-        public bool ResultsPublishedNotificationShown = false;
+        public bool ResultsPublishedNotificationShown;
 
-        public static bool PendingResultsMenuCleared = false;
-        public static bool ResultsMenuCleared = false;
+        public static bool PendingResultsMenuCleared;
+        public static bool ResultsMenuCleared;
 
-        public string XMLIdentifier
+        public string XmlIdentifier => SuspectName + (SuspectDob.ToBinary()) + Crime + (CrimeDate.ToBinary());
+
+        private string MenuLabel(bool NewLine)
         {
-            get
-            {
-                return SuspectName + (SuspectDOB.ToBinary()).ToString() + Crime + (CrimeDate.ToBinary()).ToString();
-            }
-        }
-
-        public string MenuLabel(bool NewLine)
-        {
-
             string s = "~r~" + SuspectName + "~s~, ";
             if (NewLine)
             {
                 s += "~n~";
             }
-            s += "~b~" + SuspectDOB.ToShortDateString();
-            return s;
 
+            s += "~b~" + SuspectDob.ToShortDateString();
+            return s;
         }
 
 
-        public CourtCase() { }
-        public CourtCase(string SuspectName, DateTime SuspectDOB, string Crime, DateTime CrimeDate, int GuiltyChance, string CourtVerdict, DateTime ResultsPublishTime, bool Published, bool ResultsPublishedNotificationShown)
+        public CourtCase()
+        {
+        }
+
+        public CourtCase(string SuspectName, DateTime SuspectDob, string Crime, DateTime CrimeDate, int GuiltyChance,
+            string CourtVerdict, DateTime ResultsPublishTime, bool Published, bool ResultsPublishedNotificationShown)
         {
             this.SuspectName = SuspectName;
-            this.SuspectDOB = SuspectDOB;
+            this.SuspectDob = SuspectDob;
             this.Crime = Crime;
             this.GuiltyChance = GuiltyChance;
-            if (GuiltyChance < 0) { GuiltyChance = 0; } else if (GuiltyChance > 100) { GuiltyChance = 100; }
+            if (GuiltyChance < 0)
+            {
+                this.GuiltyChance = 0;
+            }
+            else if (GuiltyChance > 100)
+            {
+                this.GuiltyChance = 100;
+            }
+
             this.CourtVerdict = CourtVerdict;
             this.ResultsPublishTime = ResultsPublishTime;
-            this.ResultsPublished = Published;
+            ResultsPublished = Published;
             this.CrimeDate = CrimeDate;
             this.ResultsPublishedNotificationShown = ResultsPublishedNotificationShown;
         }
@@ -418,8 +418,6 @@ namespace LSPDFR_
             {
                 //add to pending menu
                 AddToPendingCases();
-
-
             }
         }
 
@@ -433,118 +431,135 @@ namespace LSPDFR_
 
         private void PublishCourtResults()
         {
-            if (!CourtSystem.PublishedCourtCases.Contains(this))
+            if (CourtSystem.PublishedCourtCases.Contains(this)) return;
+            if (CourtSystem.PendingCourtCases.Contains(this))
             {
-
-                if (CourtSystem.PendingCourtCases.Contains(this))
+                Menus.PendingResultsList.Items.RemoveAt(CourtSystem.PendingCourtCases.IndexOf(this));
+                if (Menus.PendingResultsList.Items.Count == 0)
                 {
-                    Menus.PendingResultsList.Items.RemoveAt(CourtSystem.PendingCourtCases.IndexOf(this));
-                    if (Menus.PendingResultsList.Items.Count == 0) { Menus.PendingResultsList.Items.Add(new TabItem(" ")); PendingResultsMenuCleared = false; }
-                    Menus.PendingResultsList.Index = 0;
-                    CourtSystem.PendingCourtCases.Remove(this);
-                }
-                CourtSystem.PublishedCourtCases.Insert(0, this);
-                string CrimeString = char.ToUpper(Crime[0]) + Crime.ToLower().Substring(1);
-                if (GuiltyChance < 0) { GuiltyChance = 0; } else if (GuiltyChance > 100) { GuiltyChance = 100; }
-                if (LSPDFRPlusHandler.rnd.Next(100) >= GuiltyChance && !ResultsPublishedNotificationShown)
-                {
-                    CourtVerdict = "Found not guilty and cleared of all charges.";
+                    Menus.PendingResultsList.Items.Add(new TabItem(" "));
+                    PendingResultsMenuCleared = false;
                 }
 
-                TabTextItem item = new TabTextItem(MenuLabel(false), "Court Result", MenuLabel(false) + "~s~. ~r~" + CrimeString + (Crime[Crime.Length - 1] == '.' ? "" : "~s~.")
-                    + "~s~~n~ " + CourtVerdict + (CourtVerdict[CourtVerdict.Length - 1] == '.' ? "" : "~s~.")
-                    + "~s~~n~ Offence took place on ~b~" + CrimeDate.ToShortDateString() + "~s~ at ~b~" + CrimeDate.ToShortTimeString()
-                    + "~s~.~n~ Hearing was on ~b~" + ResultsPublishTime.ToShortDateString() + "~s~ at ~b~" + ResultsPublishTime.ToShortTimeString() + "."
-                    + "~n~~n~~y~Select this case and press ~b~Delete ~y~to dismiss it.");
-                
-                Menus.PublishedResultsList.Items.Insert(0, item);
-                Menus.PublishedResultsList.RefreshIndex();
+                Menus.PendingResultsList.Index = 0;
+                CourtSystem.PendingCourtCases.Remove(this);
+            }
 
-                if (!ResultsMenuCleared)
-                {
+            CourtSystem.PublishedCourtCases.Insert(0, this);
+            string crimeString = char.ToUpper(Crime[0]) + Crime.ToLower().Substring(1);
+            if (GuiltyChance < 0)
+            {
+                GuiltyChance = 0;
+            }
+            else if (GuiltyChance > 100)
+            {
+                GuiltyChance = 100;
+            }
 
-                    Game.LogTrivial("Emtpy items, clearing menu at index 1.");
-                    Menus.PublishedResultsList.Items.RemoveAt(1);
-                    ResultsMenuCleared = true;
-                }
-                ResultsPublished = true;
-                if (!ResultsPublishedNotificationShown)
+            if (LSPDFRPlusHandler.Rnd.Next(100) >= GuiltyChance && !ResultsPublishedNotificationShown)
+            {
+                CourtVerdict = "Found not guilty and cleared of all charges.";
+            }
+
+            TabTextItem item = new TabTextItem(MenuLabel(false), "Court Result",
+                MenuLabel(false) + "~s~. ~r~" + crimeString + (Crime[Crime.Length - 1] == '.' ? "" : "~s~.")
+                + "~s~~n~ " + CourtVerdict + (CourtVerdict[CourtVerdict.Length - 1] == '.' ? "" : "~s~.")
+                + "~s~~n~ Offence took place on ~b~" + CrimeDate.ToShortDateString() + "~s~ at ~b~" +
+                CrimeDate.ToShortTimeString()
+                + "~s~.~n~ Hearing was on ~b~" + ResultsPublishTime.ToShortDateString() + "~s~ at ~b~" +
+                ResultsPublishTime.ToShortTimeString() + "."
+                + "~n~~n~~y~Select this case and press ~b~Delete ~y~to dismiss it.");
+
+            Menus.PublishedResultsList.Items.Insert(0, item);
+            Menus.PublishedResultsList.RefreshIndex();
+
+            if (!ResultsMenuCleared)
+            {
+                Game.LogTrivial("Empty items, clearing menu at index 1.");
+                Menus.PublishedResultsList.Items.RemoveAt(1);
+                ResultsMenuCleared = true;
+            }
+
+            ResultsPublished = true;
+            if (ResultsPublishedNotificationShown) return;
+            if (CourtSystem.LoadingXmlFileCases)
+            {
+                GameFiber.StartNew(delegate
                 {
-                    if (CourtSystem.LoadingXMLFileCases)
+                    GameFiber.Wait(25000);
+                    if (CourtSystem.OpenCourtMenuKey != Keys.None)
                     {
-                        GameFiber.StartNew(delegate
-                        {
-                            GameFiber.Wait(25000);
-                            if (CourtSystem.OpenCourtMenuKey != Keys.None)
-                            {
-                                Game.DisplayNotification("3dtextures", "mpgroundlogo_cops", "~b~San Andreas Court", "~r~" + SuspectName, "A court case you're following has been heard. Press ~b~" + Albo1125.Common.CommonLibrary.ExtensionMethods.GetKeyString(CourtSystem.OpenCourtMenuKey, CourtSystem.OpenCourtMenuModifierKey) + ".");
-                            }
-                        });
-
+                        Game.DisplayNotification("3dtextures", "mpgroundlogo_cops", "~b~San Andreas Court",
+                            "~r~" + SuspectName,
+                            "A court case you're following has been heard. Press ~b~" +
+                            ExtensionMethods.GetKeyString(CourtSystem.OpenCourtMenuKey,
+                                CourtSystem.OpenCourtMenuModifierKey) + ".");
                     }
-                    else
-                    {
-                        if (CourtSystem.OpenCourtMenuKey != Keys.None)
-                        {
-                            Game.DisplayNotification("3dtextures", "mpgroundlogo_cops", "~b~San Andreas Court", "~r~" + SuspectName, "A court case you're following has been heard. Press ~b~" + Albo1125.Common.CommonLibrary.ExtensionMethods.GetKeyString(CourtSystem.OpenCourtMenuKey, CourtSystem.OpenCourtMenuModifierKey) + ".");
-                        }
-                    }
-                    ResultsPublishedNotificationShown = true;
-                    CourtSystem.OverwriteCourtCase(this);
+                });
+            }
+            else
+            {
+                if (CourtSystem.OpenCourtMenuKey != Keys.None)
+                {
+                    Game.DisplayNotification("3dtextures", "mpgroundlogo_cops", "~b~San Andreas Court",
+                        "~r~" + SuspectName,
+                        "A court case you're following has been heard. Press ~b~" +
+                        ExtensionMethods.GetKeyString(CourtSystem.OpenCourtMenuKey,
+                            CourtSystem.OpenCourtMenuModifierKey) + ".");
                 }
             }
 
-
-
+            ResultsPublishedNotificationShown = true;
+            CourtSystem.OverwriteCourtCase(this);
         }
 
         private void AddToPendingCases()
         {
-            if (!CourtSystem.PendingCourtCases.Contains(this))
+            if (CourtSystem.PendingCourtCases.Contains(this)) return;
+            if (CourtSystem.PublishedCourtCases.Contains(this))
             {
-
-                if (CourtSystem.PublishedCourtCases.Contains(this))
+                Menus.PublishedResultsList.Items.RemoveAt(CourtSystem.PublishedCourtCases.IndexOf(this));
+                if (Menus.PublishedResultsList.Items.Count == 0)
                 {
-                    Menus.PublishedResultsList.Items.RemoveAt(CourtSystem.PublishedCourtCases.IndexOf(this));
-                    if (Menus.PublishedResultsList.Items.Count == 0) { Menus.PublishedResultsList.Items.Add(new TabItem(" ")); ResultsMenuCleared = false; }
-                    Menus.PublishedResultsList.Index = 0;
-                    CourtSystem.PublishedCourtCases.Remove(this);
+                    Menus.PublishedResultsList.Items.Add(new TabItem(" "));
+                    ResultsMenuCleared = false;
                 }
-                CourtSystem.PendingCourtCases.Insert(0, this);
-                string CrimeString = char.ToUpper(Crime[0]) + Crime.ToLower().Substring(1);
-                TabTextItem item = new TabTextItem(MenuLabel(false), "Court Date Pending", MenuLabel(false) + ". ~n~Hearing is for: ~r~" + CrimeString + ".~s~~n~ Offence took place on ~b~"
-                    + CrimeDate.ToShortDateString() + "~s~ at ~b~" + CrimeDate.ToShortTimeString() + "~s~~n~ Hearing date: ~y~" + ResultsPublishTime.ToShortDateString() + " " + ResultsPublishTime.ToShortTimeString()
-                    + "~n~~n~~y~Select this case and press ~b~Insert ~s~to make the hearing take place immediately, or ~b~Delete ~y~to dismiss it.");
-                Menus.PendingResultsList.Items.Insert(0, item);
-                Menus.PendingResultsList.RefreshIndex();
-                
-                if (!PendingResultsMenuCleared)
-                {
 
-                    Game.LogTrivial("Emtpy items, clearing menu at index 1.");
-                    Menus.PendingResultsList.Items.RemoveAt(1);
-                    PendingResultsMenuCleared = true;
-
-                }
-                if (!CourtSystem.LoadingXMLFileCases)
-                {
-                    if (CourtSystem.OpenCourtMenuKey != Keys.None)
-                    {
-
-                        Game.DisplayNotification("3dtextures", "mpgroundlogo_cops", "~b~San Andreas Court", "~r~" + SuspectName, "You're now following a new pending court case. Press ~b~" + Albo1125.Common.CommonLibrary.ExtensionMethods.GetKeyString(CourtSystem.OpenCourtMenuKey, CourtSystem.OpenCourtMenuModifierKey) + ".");
-                    }
-                }
-                ResultsPublished = false;
-
+                Menus.PublishedResultsList.Index = 0;
+                CourtSystem.PublishedCourtCases.Remove(this);
             }
-        }
 
-        public void DeleteCourtCase()
-        {
+            CourtSystem.PendingCourtCases.Insert(0, this);
+            string crimeString = char.ToUpper(Crime[0]) + Crime.ToLower().Substring(1);
+            TabTextItem item = new TabTextItem(MenuLabel(false), "Court Date Pending",
+                MenuLabel(false) + ". ~n~Hearing is for: ~r~" + crimeString + ".~s~~n~ Offence took place on ~b~"
+                + CrimeDate.ToShortDateString() + "~s~ at ~b~" + CrimeDate.ToShortTimeString() +
+                "~s~~n~ Hearing date: ~y~" + ResultsPublishTime.ToShortDateString() + " " +
+                ResultsPublishTime.ToShortTimeString()
+                + "~n~~n~~y~Select this case and press ~b~Insert ~s~to make the hearing take place immediately, or ~b~Delete ~y~to dismiss it.");
+            Menus.PendingResultsList.Items.Insert(0, item);
+            Menus.PendingResultsList.RefreshIndex();
 
-            CourtSystem.DeleteCourtCase(this);
+            if (!PendingResultsMenuCleared)
+            {
+                Game.LogTrivial("Empty items, clearing menu at index 1.");
+                Menus.PendingResultsList.Items.RemoveAt(1);
+                PendingResultsMenuCleared = true;
+            }
 
+            if (!CourtSystem.LoadingXmlFileCases)
+            {
+                if (CourtSystem.OpenCourtMenuKey != Keys.None)
+                {
+                    Game.DisplayNotification("3dtextures", "mpgroundlogo_cops", "~b~San Andreas Court",
+                        "~r~" + SuspectName,
+                        "You're now following a new pending court case. Press ~b~" +
+                        ExtensionMethods.GetKeyString(CourtSystem.OpenCourtMenuKey,
+                            CourtSystem.OpenCourtMenuModifierKey) + ".");
+                }
+            }
 
+            ResultsPublished = false;
         }
     }
 }

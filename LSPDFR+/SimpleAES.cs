@@ -1,10 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace LSPDFR_
 {
@@ -17,7 +14,7 @@ namespace LSPDFR_
 
 
         private ICryptoTransform EncryptorTransform, DecryptorTransform;
-        private System.Text.UTF8Encoding UTFEncoder;
+        private UTF8Encoding UTFEncoder;
 
         public SimpleAES()
         {
@@ -25,11 +22,11 @@ namespace LSPDFR_
             RijndaelManaged rm = new RijndaelManaged();
 
             //Create an encryptor and a decryptor using our encryption method, key, and vector.
-            EncryptorTransform = rm.CreateEncryptor(this.Key, this.Vector);
-            DecryptorTransform = rm.CreateDecryptor(this.Key, this.Vector);
+            EncryptorTransform = rm.CreateEncryptor(Key, Vector);
+            DecryptorTransform = rm.CreateDecryptor(Key, Vector);
 
             //Used to translate bytes to text and vice versa
-            UTFEncoder = new System.Text.UTF8Encoding();
+            UTFEncoder = new UTF8Encoding();
         }
 
         
@@ -142,10 +139,10 @@ namespace LSPDFR_
             for (int i = 0; i <= byteArr.GetUpperBound(0); i++)
             {
                 val = byteArr[i];
-                if (val < (byte)10)
-                    tempStr += "00" + val.ToString();
-                else if (val < (byte)100)
-                    tempStr += "0" + val.ToString();
+                if (val < 10)
+                    tempStr += "00" + val;
+                else if (val < 100)
+                    tempStr += "0" + val;
                 else
                     tempStr += val.ToString();
             }

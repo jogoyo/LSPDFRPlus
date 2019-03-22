@@ -1,14 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Rage;
-using LSPD_First_Response.Engine.Scripting.Entities;
 using System.Reflection;
-using System.Security.Cryptography;
-using System.Runtime.CompilerServices;
-using Albo1125.Common.CommonLibrary;
+using LSPD_First_Response.Engine.Scripting.Entities;
+using Rage;
 
 namespace LSPDFR_.API
 {
@@ -107,8 +101,8 @@ namespace LSPDFR_.API
         public static void AddQuestionToTrafficStop(Ped Suspect, string Question, List<string> Answers)
         {
             Game.LogTrivial("LSPDFR+ API adding new question to Traffic Stop - 2.");
-            string Answer = Answers[LSPDFRPlusHandler.rnd.Next(Answers.Count)];
-            EnhancedTrafficStop.PedsWithCustomTrafficStopQuestionsAndAnswers.Add(Suspect, Question, Answer);
+            string answer = Answers[LSPDFRPlusHandler.Rnd.Next(Answers.Count)];
+            EnhancedTrafficStop.PedsWithCustomTrafficStopQuestionsAndAnswers.Add(Suspect, Question, answer);
             Menus.UpdateTrafficStopQuestioning();
 
         }
@@ -121,9 +115,9 @@ namespace LSPDFR_.API
         public static void AddQuestionToTrafficStop(Ped Suspect, List<string> Questions, List<string> Answers)
         {
             Game.LogTrivial("LSPDFR+ API adding new question to Traffic Stop - 3.");
-            string Answer = Answers[LSPDFRPlusHandler.rnd.Next(Answers.Count)];
-            string Question = Questions[LSPDFRPlusHandler.rnd.Next(Questions.Count)];
-            EnhancedTrafficStop.PedsWithCustomTrafficStopQuestionsAndAnswers.Add(Suspect, Question, Answer);
+            string answer = Answers[LSPDFRPlusHandler.Rnd.Next(Answers.Count)];
+            string question = Questions[LSPDFRPlusHandler.Rnd.Next(Questions.Count)];
+            EnhancedTrafficStop.PedsWithCustomTrafficStopQuestionsAndAnswers.Add(Suspect, question, answer);
             Menus.UpdateTrafficStopQuestioning();
 
         }
@@ -152,8 +146,8 @@ namespace LSPDFR_.API
         public static void AddQuestionToTrafficStop(Ped Suspect, string Question, List<string> Answers, Action<Ped, string> Callback)
         {
             Game.LogTrivial("LSPDFR+ API adding new question to Traffic Stop - 5.");
-            string Answer = Answers[LSPDFRPlusHandler.rnd.Next(Answers.Count)];
-            EnhancedTrafficStop.PedsCustomQuestionsAnswerCallback.Add(Suspect, Question, Answer, Callback);
+            string answer = Answers[LSPDFRPlusHandler.Rnd.Next(Answers.Count)];
+            EnhancedTrafficStop.PedsCustomQuestionsAnswerCallback.Add(Suspect, Question, answer, Callback);
             Menus.UpdateTrafficStopQuestioning();
 
         }
@@ -165,7 +159,7 @@ namespace LSPDFR_.API
         /// <param name="Hide">If true, hides standard questions. If false, shows standard questions.</param>
         public static void HideStandardTrafficStopQuestions(Ped Suspect, bool Hide)
         {
-            Game.LogTrivial("LSPDFR+ API hiding standard questions: " + Hide.ToString());
+            Game.LogTrivial("LSPDFR+ API hiding standard questions: " + Hide);
             if (Hide)
             {
                 EnhancedTrafficStop.PedsWhereStandardQuestionsAreHidden.Add(Suspect);
@@ -195,11 +189,7 @@ namespace LSPDFR_.API
         public static event PedEvent PedOrderedOutOfVehicle;
         internal static void OnPedOrderedOutOfVehicle(Ped ped)
         {
-
-            if (PedOrderedOutOfVehicle != null)
-            {
-                PedOrderedOutOfVehicle(ped);
-            }
+            PedOrderedOutOfVehicle?.Invoke(ped);
         }
 
         /// <summary>
@@ -208,10 +198,7 @@ namespace LSPDFR_.API
         public static event PedEvent TrafficStopInitiated;
         internal static void OnTrafficStopInitiated (Ped ped)
         {
-            if (TrafficStopInitiated != null)
-            {
-                TrafficStopInitiated(ped);
-            }
+            TrafficStopInitiated?.Invoke(ped);
         }
         #endregion
 
@@ -221,29 +208,26 @@ namespace LSPDFR_.API
         public static event Action PlayerJoinedActivePursuit;
         internal static void OnPlayerJoinedActivePursuit()
         {
-            if (PlayerJoinedActivePursuit != null)
-            {
-                PlayerJoinedActivePursuit();
-            }
+            PlayerJoinedActivePursuit?.Invoke();
         }
 
         /// <summary>
         /// Returns the current pursuit tactic.
         /// </summary>
         /// <returns></returns>
-        public static PursuitTactics GetCurrentPursuitTactics()
+/*        public static PursuitTactics GetCurrentPursuitTactics()
         {
             return EnhancedPursuitAI.CurrentPursuitTactic;
-        }
+        }*/
 
         /// <summary>
         /// Returns true if automatic tactics are enabled for pursuits, and false if not.
         /// </summary>
         /// <returns></returns>
-        public static bool ArePursuitTacticsAutomatic()
+/*        public static bool ArePursuitTacticsAutomatic()
         {
-            return EnhancedPursuitAI.AutomaticAI;
-        }
+            return EnhancedPursuitAI.AutomaticAi;
+        }*/
     }
 
     /// <summary>
@@ -252,10 +236,10 @@ namespace LSPDFR_.API
     public static class ProtectedFunctions
     {
 
-        private static List<string> ProtectedStatistics = new List<string>()
+/*        private static List<string> ProtectedStatistics = new List<string>
         {
             "people arrested", "times gone on duty", "pursuits", "traffic stops", "traffic stop - tickets issued", "minutes spent on duty"
-        };
+        };*/
 
         /// <summary>
         /// Increases the specified statistic by one.
@@ -269,20 +253,6 @@ namespace LSPDFR_.API
         }
 
         /// <summary>
-        /// Increases the specified statistic by one.
-        /// </summary>
-        /// <param name="PluginName">The name of your plugin.</param>
-        /// <param name="Statistic">The statistic to increase.</param>
-        public static void AddCountToStatistic(string PluginName, string Statistic)
-        {           
-            if (!ProtectedStatistics.Contains(Statistic.ToLower()))
-            {
-                Game.LogTrivial("LSPDFR+ API: Plugin is increasing statistic: " + Statistic);
-                StatisticsCounter.AddCountToStatistic(Statistic, PluginName);
-            }           
-        }
-
-        /// <summary>
         /// If Signature matches with the passed ExecutingAssembly, PluginName and AuthorName, returns a security Guid to allow use of this class's functions.
         /// </summary>
         /// <param name="ExecutingAssembly">Pass the following: System.Reflection.Assembly.GetExecutingAssembly()</param>
@@ -290,11 +260,11 @@ namespace LSPDFR_.API
         /// <param name="AuthorName">Exact AuthorName as agreed between you and me.</param>
         /// <param name="Signature">The Signature as you obtained from me.</param>
         /// <returns>If verification is successful, returns a security Guid. If unsuccessful, returns an empty Guid.</returns>
-        [Obsolete("Security GUIDs are no longer used. Call methods directly.", true)]
+/*        [Obsolete("Security GUIDs are no longer used. Call methods directly.", true)]
         public static Guid GenerateSecurityGuid(Assembly ExecutingAssembly, string PluginName, string AuthorName, string Signature)
         {
             Game.LogTrivial("LSPDFR+: Security GUIDs are now obsolete.");
             return Guid.Empty;           
-        }
+        }*/
     }
 }
